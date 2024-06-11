@@ -16,6 +16,14 @@ struct Auth{
     user: String,
     password: String,
 }
+
+#[derive(Deserialize)]
+struct Del{
+    id: String,
+    user: String,
+    password: String,
+}
+
 async fn list(Json(auth): Json<Auth>) -> Json<Vec<String>>{
     let mut data = String::new();
     std::fs::File::open("config").expect("Failed to open config").read_to_string(&mut data).expect("Failed to open config");
@@ -55,11 +63,27 @@ async fn create(Json(note): Json<Note>) -> String{
     }
 }
 
+async fn delete(Json(del): Json<Del>) -> String{
+    let mut data = String::new();
+    std::fs::File::open("config").expect("Failed to open config").read_to_string(&mut data).expect("Failed to open config");
+    let cfg: Auth = toml::from_str(&data).unwrap();
+    if del.user == cfg.user && del.password == cfg.password{
+        let con = sqlite::open("db.sql").unwrap();
+        let query = "DELETE FROM notes WHERE id = ".to_owned() + &del.id  + ";";
+        con.execute(query).unwrap();
+        "Deleted a note".to_string()
+    }
+    else{
+        "Authentication failed".to_string()
+    }
+}
+
 #[tokio::main]
 async fn main(){
     let app = Router::new()
         .route("/list", post(list))
-        .route("/new", post(create));
+        .route("/new", post(create))
+        .route("/delete", post(delete));
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
         .serve(app.into_make_service())
         .await
